@@ -33,7 +33,7 @@ func fetchManager(dlLogCh chan<- *DownloadLog) {
 
 			defer wg.Done()
 
-			feed, err := getRSS(e.URL)
+			feed, err := getRSS2(e.URL, dlLogCh)
 			if err != nil {
 				log.Printf("Unable to fetch %s, %s", e.URL, err)
 			} else {
@@ -43,15 +43,13 @@ func fetchManager(dlLogCh chan<- *DownloadLog) {
 				// Call the feed handler
 				handleFeed(feed, c.DownloadDir, dlLogCh)
 			}
-
-			// Publish download log line
 			log.Printf("Ending goroutine for feed %s", e.URL)
 		}()
 	}
 	wg.Wait()
 }
 
-func getRSS(URL string) (*Feed, error) {
+func getRSS2(URL string, dlLogCh chan<- *DownloadLog) (*Feed, error) {
 	type Enclosure struct {
 		URL string `xml:"url,attr"`
 	}
@@ -69,18 +67,30 @@ func getRSS(URL string) (*Feed, error) {
 
 	log.Print("Fetching RSS URL: " + URL)
 
+	d := new(DownloadLog)
+	d.itemType = "Feed"
+	d.item = URL
+
 	var items = new(Rss2)
 	var f = new(Feed)
 
 	response, err := http.Get(URL)
 	log.Printf("Recieved response of size: %d", response.ContentLength)
 	if err != nil {
+
+		d.errors = fmt.Sprintf("Error downloading feed: %s", err)
+		dlLogCh <- d
+
 		return nil, err
 	}
 
 	decoded := xml.NewDecoder(response.Body)
 	err = decoded.Decode(items)
 	if err != nil {
+
+		d.errors = fmt.Sprintf("Error parsing feed XML: %s", err)
+		dlLogCh <- d
+
 		return nil, err
 	}
 
@@ -89,6 +99,9 @@ func getRSS(URL string) (*Feed, error) {
 	for _, e := range items.ItemList {
 		f.URLs = append(f.URLs, e.Enclosures.URL)
 	}
+
+	d.data = "Successfully downloaded feed"
+	dlLogCh <- d
 
 	return f, nil
 }
@@ -137,7 +150,10 @@ func handleFeed(feed *Feed, dlPath string, dlLogCh chan<- *DownloadLog) {
 
 		// Push accumulated statistics
 		dlLogCh <- d
-		reapFiles(path, feed.NumDownloads)
+
+		// Clean up old files per config.
+		// Execute asynchronously, don't care about result.
+		go reapFiles(path, feed.NumDownloads)
 	}
 }
 

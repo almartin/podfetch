@@ -90,20 +90,18 @@ func main() {
 	log.Printf("Intial fetch")
 	fetchManager(dlLogChan)
 
-	log.Printf("Starting ticker")
-	ticker := time.NewTicker(duration)
+	log.Printf("Starting timer")
+	timer := time.NewTimer(duration)
 
 	// Process events
 	for {
 		select {
-		case <-ticker.C:
+		case <-timer.C:
 			log.Println("Timer fired")
-			log.Printf("Stopping ticker for the duration of the update.")
-			ticker.Stop()
 
 			fetchManager(dlLogChan)
-			log.Printf("Restarting ticker")
-			ticker = time.NewTicker(duration)
+			log.Printf("Restarting timer")
+			timer = time.NewTimer(duration)
 		}
 	}
 

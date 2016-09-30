@@ -12,8 +12,9 @@ func (c *Config) Validate() error {
 
 	// Check for required configuration values
 	if len(c.DownloadDir) == 0 {
-		log.Printf("Required attribute DownloadDir not configured")
-		err := errors.New("Required attribute DownloadDir not configured")
+		str := "Required attribute DownloadDir not configured"
+		log.Printf(str)
+		err := errors.New(str)
 		return err
 	}
 
